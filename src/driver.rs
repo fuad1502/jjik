@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use crate::{code_gen::CodeGen, gg::Gg};
-///
+
 /// Generates Rust modules for parsing grammars specified with a GG file.
 ///
 /// This function generates three Rust modules: `parser.rs`, `lexer.rs`, and `symbol.rs` at the
