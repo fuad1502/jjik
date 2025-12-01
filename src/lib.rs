@@ -61,14 +61,14 @@ will emit those errors.
 
 To use the parser, create `src/lib.rs` to include the generated modules:
 
-```rust
+```ignore
 mod lexer;
 mod parser;
 mod symbol;
 ```
 Finally, construct the concrete syntax tree for your input:
 
-```rust
+```ignore
 let input_str = "1 + (2 + 3 * 4 - 5) + 6 / 2";
 let mut lexer = lexer::Lexer::from_source_str(input_str);
 let mut parser = parser::Parser::new();
@@ -118,7 +118,7 @@ assign the priority to.
 
 The concrete syntax tree nodes are `Symbol`s:
 
-```rust
+```ignore
 pub enum Symbol {
     NonTerminal(NonTerminal),
     Terminal(Terminal),
@@ -139,14 +139,14 @@ pub struct NonTerminal {
 back to the `Lexer`. To get the lexeme of a terminal, you have to query the `Lexer` through
 `get_lexeme`:
 
-```rust
+```ignore
 pub fn get_lexeme(&self, token: &Terminal) -> &str
 ```
 `NonTerminal` also have a `class` to identify it. However, it also has a `rule` associated with it,
 through which we can traverse down the tree. As specified in the GG file, each rule has symbols
 that it derives. These symbols are accessible through the `components` field of a `Rule`:
 
-```
+```ignore
 pub struct Rule {
     pub components: Vec<Symbol>,
     pub number: usize,

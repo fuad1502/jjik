@@ -329,8 +329,9 @@ mod test {
 
     #[test]
     fn main() {
-        let mut simple_calculator_gg = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        simple_calculator_gg.push("test/fixtures/simple_calculator.gg");
+        let simple_calculator_gg = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("gg")
+            .join("simple_calculator.gg");
         let lexer = Lexer::new(&simple_calculator_gg).unwrap();
         let parser = Parser::new(lexer);
         let gg = parser.parse().unwrap();
