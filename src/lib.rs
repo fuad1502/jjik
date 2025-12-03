@@ -1,4 +1,6 @@
 /*!
+Generate LR(1) parser from grammar specification.
+
 JJIK generates Rust code for parsing the language you specify using a GG file. Here is an example
 of a GG file for specifying simple arithmetic expressions:
 
@@ -133,7 +135,6 @@ pub struct NonTerminal {
     pub rule: Rule,
     pub class: NonTerminalClass,
 }
-
 ```
 `Terminal`s are the leaf nodes, with a `class` to identify it, and a `span` to trace its location
 back to the `Lexer`. To get the lexeme of a terminal, you have to query the `Lexer` through
