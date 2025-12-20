@@ -73,6 +73,9 @@ impl ParseTable {
     }
 
     fn create_first_table(mut self) -> Self {
+        for non_terminal in &self.non_terminals {
+            self.first_table.insert(*non_terminal, vec![]);
+        }
         loop {
             let mut changed = false;
             for target_non_terminal in &self.non_terminals {
