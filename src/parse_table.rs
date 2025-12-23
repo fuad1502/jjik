@@ -73,9 +73,6 @@ impl ParseTable {
     }
 
     fn create_first_table(mut self) -> Self {
-        for non_terminal in &self.non_terminals {
-            self.first_table.insert(*non_terminal, vec![]);
-        }
         loop {
             let mut changed = false;
             for target_non_terminal in &self.non_terminals {
@@ -83,11 +80,13 @@ impl ParseTable {
                     for symbol in &rule.symbols {
                         match symbol {
                             Symbol::NonTerminal(non_terminal) => {
-                                changed = Self::copy_first_terminals(
+                                if Self::copy_first_terminals(
                                     &mut self.first_table,
                                     non_terminal,
                                     target_non_terminal,
-                                );
+                                ) {
+                                    changed = true
+                                }
                                 if !Self::first_contains_empty_terminal(
                                     &self.first_table,
                                     non_terminal,
@@ -96,11 +95,13 @@ impl ParseTable {
                                 }
                             }
                             Symbol::Terminal(terminal) => {
-                                changed = Self::add_terminal_to_first(
+                                if Self::add_terminal_to_first(
                                     &mut self.first_table,
                                     target_non_terminal,
                                     terminal,
-                                );
+                                ) {
+                                    changed = true;
+                                }
                                 break;
                             }
                         }
