@@ -276,7 +276,9 @@ enum Action {{
         let found = terminal.class();
         let expected = self.expected_classes();
         let span_str = lexer.show_span(&span);
-        format!("{{span_str}}\nerror: found {{found:?}}, expected: {{expected:?}}")
+        let red = "\x1B[31m";
+        let end = "\x1B[0m";
+        format!("{{span_str}}\n{{red}}error{{end}}: found {{found:?}}, expected: {{expected:?}}")
     }}
 
     fn expected_classes(&self) -> Vec<TerminalClass> {{
