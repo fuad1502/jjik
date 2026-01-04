@@ -1,3 +1,4 @@
+#![allow(clippy::needless_doctest_main)]
 /*!
 Generate LR(1) parser from grammar specification.
 
