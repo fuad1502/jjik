@@ -2,6 +2,13 @@
 name = "jjik"
 version = "0.1.0"
 edition = "2024"
+description = "LR(1) parser generator"
+authors = ["Fuad Ismail <fuad1502@gmail.com>"]
+license = "MIT"
+license-file = "LICENSE"
+repository = "https://github.com/fuad1502/jjik"
+readme = "README.md"
+keywords = ["compiler", "parser"]
 
 [dependencies]
 jlek = { version="0.1.0", path="../jlek/" }
