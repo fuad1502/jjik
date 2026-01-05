@@ -3,9 +3,9 @@
 [![CI](https://github.com/fuad1502/jjik/actions/workflows/CI.yml/badge.svg)](https://github.com/fuad1502/jjik/actions/workflows/CI.yml)
 
 > [!NOTE]
-> This project is part of my ["Compiler Toys"
-> project](https://github.com/fuad1502/compiler_toys), originally meant as a
-> learning exercise on Compilers.
+> This project is part of the ["Compiler
+> Toys"](https://github.com/fuad1502/compiler_toys) project, originally meant
+> as a learning exercise on Compilers.
 
 JJIK is a LR(1) parser generator similar to YACC.
 
