@@ -10,4 +10,4 @@ readme = "README.md"
 keywords = ["compiler", "parser"]
 
 [dependencies]
-jlek = { version="0.1.0", path="../jlek/" }
+jlek = { version="0.1.0" }
