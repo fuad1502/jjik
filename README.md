@@ -64,7 +64,8 @@ If there are any errors encountered during lexing or parsing, the parser
 function will return an `Result::Err(String)` which explicitly show where the
 error occured, and in case of syntax error, the list of expected tokens. For
 example, if the string `"100 * 200 500"` is given as input to
-[jjik_simple_calculator::calculate](), it will return the following error:
+[jjik_simple_calculator::calculate](https://github.com/fuad1502/compiler_toys/blob/master/jjik_simple_calculator/src/lib.rs#L56),
+it will return the following error:
 
 ```text
 Line   1|100 * 200 500
