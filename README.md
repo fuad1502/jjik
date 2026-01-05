@@ -41,7 +41,7 @@ during tree traversal.
 
 All information on how to use JJIK, the syntax for specifying a grammar using
 GG, and how to traverse the returned concrete syntax tree can be read in the
-[crate's documentation]().
+[crate's documentation](https://docs.rs/jjik/latest/jlek/).
 
 Moreover, you can check out an example project utilizing JJIK for parsing
 mathematical expressions
