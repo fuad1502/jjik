@@ -1,4 +1,4 @@
-# JJIK
+# JJIK 🤢
 
 JJIK is a LR(1) parser generator similar to YACC.
 
