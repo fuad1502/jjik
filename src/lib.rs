@@ -43,14 +43,14 @@ Then, create a GG file for specifying your language grammar. For example, create
 
 Next, create a build script (`build.rs`):
 
-```rust
+```ignore
 use std::path::PathBuf;
 
 fn main() {
     let gg_file_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("gg")
         .join("simple_calculator.gg");
-    let output_directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let output_directory = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     if let Err(e) = jjik::driver::run(&gg_file_path, &output_directory) {
         eprintln!("{}", e);
         panic!("Failed to compile .gg file!");
@@ -65,9 +65,15 @@ will emit those errors.
 To use the parser, create `src/lib.rs` to include the generated modules:
 
 ```ignore
-mod lexer;
-mod parser;
-mod symbol;
+mod lexer {
+    include!(concat!(env!("OUT_DIR"), "/lexer.rs"));
+}
+mod parser{
+    include!(concat!(env!("OUT_DIR"), "/parser.rs"));
+}
+mod symbol{
+    include!(concat!(env!("OUT_DIR"), "/symbol.rs"));
+}
 ```
 Finally, construct the concrete syntax tree for your input:
 
