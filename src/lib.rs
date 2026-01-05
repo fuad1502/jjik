@@ -100,8 +100,8 @@ A GG file consists of three sections: `%TERMINALS`, `%RULES`, and `%PRIORITIES`,
 placed in that specific order. Terminals are specified with an identifier followed by a
 parenthesized string literal, e.g. `Number("\d\d*")`. The string literal is a regular expression
 used to identify character strings in the input as the terminal. The supported regular expression
-syntax is specified in [JLEK](). The identifier will be enumerated in `TerminalClass` in the
-generated `symbol.rs`.
+syntax is specified in [JLEK](https://docs.rs/jlek/latest/jlek/). The identifier will be enumerated
+in `TerminalClass` in the generated `symbol.rs`.
 
 Rules consists of a head and a single or multiple productions separated by "|". Each production
 consists of identifiers separated by whitespaces. If the identifier is not listed in the terminals
