@@ -1,5 +1,10 @@
 # JJIK 🤢
 
+> [!NOTE]
+> This project is part of my ["Compiler Toys"
+> project](https://github.com/fuad1502/compiler_toys), originally meant as a
+> learning exercise on Compilers.
+
 JJIK is a LR(1) parser generator similar to YACC.
 
 JJIK generates Rust code for parsing the language you specify using a GG file.
