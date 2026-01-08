@@ -56,8 +56,9 @@ impl CodeGen {
 
     fn write_parser_file(&self, parser_file: &mut File) -> std::io::Result<()> {
         Self::write_parser_uses(parser_file)?;
+        self.write_parser_globals(parser_file)?;
         Self::write_state_and_action_struct(parser_file)?;
-        self.write_parser_struct(parser_file)?;
+        Self::write_parser_struct(parser_file)?;
         self.write_parser_impl(parser_file)
     }
 
@@ -76,20 +77,8 @@ impl CodeGen {
         Self::write_parser_default_impl(parser_file)
     }
 
-    fn write_parser_impl_new(&self, parser_file: &mut File) -> std::io::Result<()> {
-        let mut tabs = Tabs::default();
-        tabs.indent();
-        tabs.indent();
-        self.write_parser_impl_new_prologue(parser_file)?;
-        self.write_actions_field(parser_file, &mut tabs)?;
-        self.write_next_states_field(parser_file, &mut tabs)?;
-        self.write_rule_component_counts_field(parser_file, &mut tabs)?;
-        self.write_rule_heads_field(parser_file, &mut tabs)?;
-        self.write_parser_impl_new_epilogue(parser_file)
-    }
-
     fn write_parser_uses(parser_file: &mut File) -> Result<(), std::io::Error> {
-        write!(
+        writeln!(
             parser_file,
             r#"use super::{{
     lexer::Lexer,
@@ -99,11 +88,62 @@ impl CodeGen {
         )
     }
 
+    fn write_parser_globals(&self, parser_file: &mut File) -> Result<(), std::io::Error> {
+        self.write_actions_global(parser_file)?;
+        writeln!(parser_file)?;
+        self.write_next_states_global(parser_file)?;
+        writeln!(parser_file)?;
+        self.write_rule_component_counts_global(parser_file)?;
+        writeln!(parser_file)?;
+        self.write_rule_heads_global(parser_file)?;
+        writeln!(parser_file)
+    }
+
+    fn write_actions_global(&self, parser_file: &mut File) -> Result<(), std::io::Error> {
+        let number_of_terminals = self.terminals.len();
+        let number_of_states = self.parse_table.states.len();
+        write!(
+            parser_file,
+            "static ACTIONS: [[Action; {number_of_terminals}]; {number_of_states}] = "
+        )?;
+        self.write_actions_init(parser_file)
+    }
+
+    fn write_next_states_global(&self, parser_file: &mut File) -> Result<(), std::io::Error> {
+        let number_of_non_terminals = self.non_terminals.len();
+        let number_of_states = self.parse_table.states.len();
+        write!(
+            parser_file,
+            "static NEXT_STATES: [[Option<usize>; {number_of_non_terminals}]; {number_of_states}] = "
+        )?;
+        self.write_next_states_init(parser_file)
+    }
+
+    fn write_rule_component_counts_global(
+        &self,
+        parser_file: &mut File,
+    ) -> Result<(), std::io::Error> {
+        let number_of_rules = self.rules.len();
+        write!(
+            parser_file,
+            "static RULE_COMPONENT_COUNTS: [usize; {number_of_rules}] = "
+        )?;
+        self.write_rule_component_counts_init(parser_file)
+    }
+
+    fn write_rule_heads_global(&self, parser_file: &mut File) -> Result<(), std::io::Error> {
+        let number_of_rules = self.rules.len();
+        write!(
+            parser_file,
+            "static RULE_HEADS: [NonTerminalClass; {number_of_rules}] = "
+        )?;
+        self.write_rule_heads_init(parser_file)
+    }
+
     fn write_state_and_action_struct(parser_file: &mut File) -> Result<(), std::io::Error> {
         write!(
             parser_file,
-            r#"
-struct State {{
+            r#"struct State {{
     symbol: Option<Symbol>,
     number: usize,
 }}
@@ -120,26 +160,18 @@ enum Action {{
         )
     }
 
-    fn write_parser_struct(&self, parser_file: &mut File) -> std::io::Result<()> {
-        let number_of_terminals = self.terminals.len();
-        let number_of_non_terminals = self.non_terminals.len();
-        let number_of_states = self.parse_table.states.len();
-        let number_of_rules = self.rules.len();
+    fn write_parser_struct(parser_file: &mut File) -> std::io::Result<()> {
         write!(
             parser_file,
             r#"pub struct Parser {{
     state_stack: Vec<State>,
-    actions: [[Action; {number_of_terminals}]; {number_of_states}],
-    next_states: [[Option<usize>; {number_of_non_terminals}]; {number_of_states}],
-    rule_component_counts: [usize; {number_of_rules}],
-    rule_heads: [NonTerminalClass; {number_of_rules}],
 }}
 
 "#
         )
     }
 
-    fn write_parser_impl_new_prologue(&self, parser_file: &mut File) -> std::io::Result<()> {
+    fn write_parser_impl_new(&self, parser_file: &mut File) -> std::io::Result<()> {
         write!(
             parser_file,
             r#"    pub fn new() -> Self {{
@@ -148,28 +180,15 @@ enum Action {{
             number: 0,
         }};
         let state_stack = vec![initial_state];
-"#
-        )
-    }
-
-    fn write_parser_impl_new_epilogue(&self, parser_file: &mut File) -> std::io::Result<()> {
-        write!(
-            parser_file,
-            r#"
-        Self {{
-            state_stack,
-            actions,
-            next_states,
-            rule_component_counts,
-            rule_heads,
-        }}
+        Self {{ state_stack }}
     }}
 "#
         )
     }
 
-    fn write_actions_field(&self, parser_file: &mut File, tabs: &mut Tabs) -> std::io::Result<()> {
-        writeln!(parser_file, "{tabs}let actions = [")?;
+    fn write_actions_init(&self, parser_file: &mut File) -> std::io::Result<()> {
+        writeln!(parser_file, "[")?;
+        let mut tabs = Tabs::new(0);
         tabs.indent();
         for state in &self.parse_table.states {
             let state_ptr = Rc::as_ptr(state);
@@ -183,15 +202,12 @@ enum Action {{
             writeln!(parser_file, "{tabs}],")?;
         }
         tabs.deindent();
-        writeln!(parser_file, "{tabs}];")
+        writeln!(parser_file, "];")
     }
 
-    fn write_next_states_field(
-        &self,
-        parser_file: &mut File,
-        tabs: &mut Tabs,
-    ) -> std::io::Result<()> {
-        writeln!(parser_file, "{tabs}let next_states = [")?;
+    fn write_next_states_init(&self, parser_file: &mut File) -> std::io::Result<()> {
+        writeln!(parser_file, "[")?;
+        let mut tabs = Tabs::new(0);
         tabs.indent();
         for state in &self.parse_table.states {
             let state_ptr = Rc::as_ptr(state);
@@ -220,24 +236,16 @@ enum Action {{
         writeln!(parser_file, "{tabs}];")
     }
 
-    fn write_rule_component_counts_field(
-        &self,
-        parser_file: &mut File,
-        tabs: &mut Tabs,
-    ) -> std::io::Result<()> {
-        write!(parser_file, "{tabs}let rule_component_counts = [",)?;
+    fn write_rule_component_counts_init(&self, parser_file: &mut File) -> std::io::Result<()> {
+        write!(parser_file, "[",)?;
         for rule in &self.rules {
             write!(parser_file, "{}, ", rule.num_of_components())?;
         }
         writeln!(parser_file, "];")
     }
 
-    fn write_rule_heads_field(
-        &self,
-        parser_file: &mut File,
-        tabs: &mut Tabs,
-    ) -> std::io::Result<()> {
-        write!(parser_file, "{tabs}let rule_heads = [")?;
+    fn write_rule_heads_init(&self, parser_file: &mut File) -> std::io::Result<()> {
+        write!(parser_file, "[")?;
         for rule in &self.rules {
             let head_name = &self
                 .non_terminals
@@ -284,7 +292,7 @@ enum Action {{
     }}
 
     fn expected_classes(&self) -> Vec<TerminalClass> {{
-        self.actions[self.current_state_number()]
+        ACTIONS[self.current_state_number()]
             .iter()
             .enumerate()
             .filter_map(|(i, a)| {{
@@ -296,10 +304,10 @@ enum Action {{
     }}
 
     fn reduce_rule(&mut self, rule_number: usize) {{
-        let non_terminal_class = self.rule_heads[rule_number];
+        let non_terminal_class = RULE_HEADS[rule_number];
         let rule = Rule::new(
             rule_number,
-            self.get_top_symbols(self.rule_component_counts[rule_number]),
+            self.get_top_symbols(RULE_COMPONENT_COUNTS[rule_number]),
         );
         let non_terminal = NonTerminal::new(rule, non_terminal_class);
         let new_state = State {{
@@ -330,11 +338,11 @@ enum Action {{
     }}
 
     fn get_action(&self, terminal_class: TerminalClass) -> Action {{
-        self.actions[self.current_state_number()][terminal_class as usize]
+        ACTIONS[self.current_state_number()][terminal_class as usize]
     }}
 
     fn next(&self, non_terminal_class: NonTerminalClass) -> usize {{
-        self.next_states[self.current_state_number()][non_terminal_class as usize].unwrap()
+        NEXT_STATES[self.current_state_number()][non_terminal_class as usize].unwrap()
     }}
 
     fn current_state_number(&self) -> usize {{
