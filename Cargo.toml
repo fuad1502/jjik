@@ -1,6 +1,6 @@
 [package]
 name = "jjik"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 description = "LR(1) parser generator"
 authors = ["Fuad Ismail <fuad1502@gmail.com>"]
