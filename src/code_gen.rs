@@ -172,10 +172,11 @@ enum Action {{
         writeln!(parser_file, "{tabs}let actions = [")?;
         tabs.indent();
         for state in &self.parse_table.states {
+            let state_ptr = Rc::as_ptr(state);
             writeln!(parser_file, "{tabs}[")?;
             tabs.indent();
             for (terminal, _) in &self.terminals {
-                let action = &self.parse_table.action_table[state][terminal];
+                let action = &self.parse_table.action_table[&state_ptr][terminal];
                 writeln!(parser_file, "{tabs}Action::{},", self.action_string(action))?;
             }
             tabs.deindent();
@@ -193,15 +194,16 @@ enum Action {{
         writeln!(parser_file, "{tabs}let next_states = [")?;
         tabs.indent();
         for state in &self.parse_table.states {
+            let state_ptr = Rc::as_ptr(state);
             writeln!(parser_file, "{tabs}[")?;
             tabs.indent();
             for (non_terminal, _) in &self.non_terminals {
-                if self.parse_table.goto_table.contains_key(state)
-                    && self.parse_table.goto_table[state]
+                if self.parse_table.goto_table.contains_key(&state_ptr)
+                    && self.parse_table.goto_table[&Rc::as_ptr(state)]
                         .contains_key(&Symbol::NonTerminal(*non_terminal))
                 {
-                    let next_state =
-                        &self.parse_table.goto_table[state][&Symbol::NonTerminal(*non_terminal)];
+                    let next_state = &self.parse_table.goto_table[&state_ptr]
+                        [&Symbol::NonTerminal(*non_terminal)];
                     writeln!(
                         parser_file,
                         "{tabs}Some({}),",
