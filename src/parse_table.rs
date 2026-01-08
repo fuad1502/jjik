@@ -1,21 +1,20 @@
-use core::{cmp::PartialEq, hash::Hash};
+use core::cmp::{Ord, PartialEq, PartialOrd};
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{NonTerminal, Priority, Rule, Symbol, Terminal, TerminalOrRule, gg::Gg};
 
-#[derive(PartialEq, Eq, Hash, PartialOrd, Ord, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct Item {
     rule: Rc<Rule>,
     position: usize,
     lookahead: Terminal,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct State {
     items: Vec<Item>,
 }
 
-#[derive(PartialEq, Eq)]
 pub enum Action {
     Shift(Rc<State>),
     Reduce(Rc<Rule>),
@@ -31,10 +30,10 @@ pub struct ParseTable {
     first_table: HashMap<NonTerminal, Vec<Terminal>>,
     priorities: HashMap<TerminalOrRule, Priority>,
     pub states: Vec<Rc<State>>,
-    pub goto_table: HashMap<Rc<State>, HashMap<Symbol, Rc<State>>>,
-    pub action_table: HashMap<Rc<State>, HashMap<Terminal, Action>>,
-    state_to_index: HashMap<Rc<State>, usize>,
-    rule_to_index: HashMap<Rc<Rule>, usize>,
+    pub goto_table: HashMap<*const State, HashMap<Symbol, Rc<State>>>,
+    pub action_table: HashMap<*const State, HashMap<Terminal, Action>>,
+    state_to_index: HashMap<*const State, usize>,
+    rule_to_index: HashMap<*const Rule, usize>,
 }
 
 impl ParseTable {
@@ -44,7 +43,7 @@ impl ParseTable {
         let symbols = Self::chain_as_symbols(&terminals, &non_terminals);
         let mut rule_to_index = HashMap::new();
         for (idx, rule) in gg.rules.iter().enumerate() {
-            rule_to_index.insert(rule.clone(), idx);
+            rule_to_index.insert(Rc::as_ptr(rule), idx);
         }
         Self {
             terminals,
@@ -65,11 +64,11 @@ impl ParseTable {
     }
 
     pub fn get_state_index(&self, state: &Rc<State>) -> usize {
-        self.state_to_index[state]
+        self.state_to_index[&Rc::as_ptr(state)]
     }
 
-    pub fn get_rule_index(&self, rule: &Rule) -> usize {
-        self.rule_to_index[rule]
+    pub fn get_rule_index(&self, rule: &Rc<Rule>) -> usize {
+        self.rule_to_index[&Rc::as_ptr(rule)]
     }
 
     fn create_first_table(mut self) -> Self {
@@ -140,11 +139,16 @@ impl ParseTable {
                         let next_state = Rc::new(next_state);
                         self.states.push(next_state.clone());
                         self.state_to_index
-                            .insert(next_state.clone(), self.states.len() - 1);
+                            .insert(Rc::as_ptr(&next_state), self.states.len() - 1);
                         unvisited_states.push(next_state.clone());
                         next_state
                     };
-                    Self::add_goto_entry(&mut self.goto_table, &current_state, symbol, &next_state);
+                    Self::add_goto_entry(
+                        &mut self.goto_table,
+                        Rc::as_ptr(&current_state),
+                        symbol,
+                        &next_state,
+                    );
                 }
             }
         }
@@ -154,7 +158,7 @@ impl ParseTable {
     fn create_action_table_for_all_states(mut self) -> Self {
         for state in &self.states {
             let actions = self.create_action_table_entry(state);
-            self.action_table.insert(state.clone(), actions);
+            self.action_table.insert(Rc::as_ptr(state), actions);
         }
         self
     }
@@ -163,7 +167,9 @@ impl ParseTable {
         let mut action_map = HashMap::new();
         for terminal in &self.terminals {
             let mut action = self.deduce_action(state, terminal);
-            if action == Action::Reduce(self.rules[0].clone()) {
+            if let Action::Reduce(rule) = &action
+                && rule == &self.rules[0]
+            {
                 action = Action::Accept;
             }
             action_map.insert(*terminal, action);
@@ -172,7 +178,7 @@ impl ParseTable {
     }
 
     fn deduce_action(&self, state: &Rc<State>, terminal: &Terminal) -> Action {
-        let shift_action = Self::shift_action(state, &self.goto_table, terminal);
+        let shift_action = Self::shift_action(Rc::as_ptr(state), &self.goto_table, terminal);
         let mut reduce_actions = Self::reduce_actions(state, terminal);
         match (shift_action, reduce_actions.len()) {
             (Some(action), 0) => action,
@@ -217,15 +223,15 @@ impl ParseTable {
     }
 
     fn shift_action(
-        state: &Rc<State>,
-        goto_table: &HashMap<Rc<State>, HashMap<Symbol, Rc<State>>>,
+        state: *const State,
+        goto_table: &HashMap<*const State, HashMap<Symbol, Rc<State>>>,
         terminal: &Terminal,
     ) -> Option<Action> {
-        if !goto_table.contains_key(state) {
+        if !goto_table.contains_key(&state) {
             return None;
         }
         goto_table
-            .get(state)
+            .get(&state)
             .unwrap()
             .iter()
             .find(|(symbol, _)| **symbol == Symbol::Terminal(*terminal))
@@ -305,16 +311,16 @@ impl ParseTable {
     }
 
     fn add_goto_entry(
-        goto_table: &mut HashMap<Rc<State>, HashMap<Symbol, Rc<State>>>,
-        state: &Rc<State>,
+        goto_table: &mut HashMap<*const State, HashMap<Symbol, Rc<State>>>,
+        state: *const State,
         symbol: &Symbol,
         next_state: &Rc<State>,
     ) {
-        if let Some(entries) = goto_table.get_mut(state) {
+        if let Some(entries) = goto_table.get_mut(&state) {
             entries.insert(*symbol, next_state.clone());
         } else {
             let entries = HashMap::from([(*symbol, next_state.clone())]);
-            goto_table.insert(state.clone(), entries);
+            goto_table.insert(state, entries);
         }
     }
 
@@ -388,6 +394,35 @@ impl Item {
 
     fn symbol_after_right_of_dot(&self) -> Option<&Symbol> {
         self.rule.symbols.get(self.position + 1)
+    }
+}
+
+impl PartialEq for Item {
+    fn eq(&self, other: &Self) -> bool {
+        let rule = Rc::as_ptr(&self.rule);
+        let other_rule = Rc::as_ptr(&other.rule);
+        rule == other_rule && self.position == other.position && self.lookahead == other.lookahead
+    }
+}
+
+impl Eq for Item {}
+
+impl PartialOrd for Item {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Item {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        let rule = Rc::as_ptr(&self.rule);
+        let other_rule = Rc::as_ptr(&other.rule);
+        other_rule.cmp(&rule).then(
+            other
+                .position
+                .cmp(&self.position)
+                .then(other.lookahead.cmp(&self.lookahead)),
+        )
     }
 }
 
