@@ -1,5 +1,6 @@
 use core::fmt::Formatter;
 use std::{
+    collections::HashMap,
     fs::{File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
@@ -20,17 +21,20 @@ pub struct CodeGen {
     terminals: Vec<(Terminal, String)>,
     non_terminals: Vec<(NonTerminal, String)>,
     rules: Vec<Rc<Rule>>,
+    rule_ids: Vec<String>,
 }
 
 impl CodeGen {
     pub fn new(gg: Gg) -> Self {
         let parse_table = ParseTable::new(&gg);
+        let rule_ids = CodeGen::calculate_rule_ids(&gg.rules, &gg.non_terminals);
         Self {
             token_specs: gg.token_specs,
             parse_table,
             terminals: gg.terminals,
             non_terminals: gg.non_terminals,
             rules: gg.rules,
+            rule_ids,
         }
     }
 
@@ -63,10 +67,12 @@ impl CodeGen {
     }
 
     fn write_symbol_file(&self, symbol_file: &mut File) -> std::io::Result<()> {
-        Self::write_base_structs(symbol_file)?;
+        self.write_base_structs(symbol_file)?;
         self.write_non_terminal_class_enum(symbol_file)?;
         self.write_terminal_class_enum(symbol_file)?;
-        self.write_terminal_class_from_impl(symbol_file)
+        self.write_rule_ids_enum(symbol_file)?;
+        self.write_terminal_class_from_impl(symbol_file)?;
+        self.write_rule_ids_from_impl(symbol_file)
     }
 
     fn write_parser_impl(&self, parser_file: &mut File) -> std::io::Result<()> {
@@ -364,7 +370,7 @@ impl Default for Parser {{
         )
     }
 
-    fn write_base_structs(symbol_file: &mut File) -> Result<(), std::io::Error> {
+    fn write_base_structs(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
         write!(
             symbol_file,
             r#"use super::lexer::Lexer;
@@ -396,7 +402,7 @@ pub struct Span {{
 #[derive(Debug)]
 pub struct Rule {{
     pub components: Vec<Symbol>,
-    pub number: usize,
+    pub id: RuleIDs,
 }}
 
 impl Symbol {{
@@ -405,8 +411,8 @@ impl Symbol {{
         match self {{
             Symbol::NonTerminal(non_terminal) => {{
                 println!(
-                    "{{indent_str}}{{:?}}({{}}):",
-                    non_terminal.class, non_terminal.rule.number
+                    "{{indent_str}}{{:?}}({{:?}}):",
+                    non_terminal.class, non_terminal.rule.id
                 );
                 for symbol in non_terminal.rule.components.iter() {{
                     symbol.pretty_print(lexer, indent + 1)
@@ -439,7 +445,7 @@ impl NonTerminal {{
 
 impl Rule {{
     pub fn new(number: usize, components: Vec<Symbol>) -> Self {{
-        Self {{ number, components }}
+        Self {{ id: RuleIDs::from(number), components }}
     }}
 }}
 
@@ -486,6 +492,21 @@ impl Span {{
         writeln!(symbol_file, "}}")
     }
 
+    fn write_rule_ids_enum(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
+        writeln!(
+            symbol_file,
+            r#"
+#[derive(Debug)]
+pub enum RuleIDs {{"#
+        )?;
+
+        let tab = Tabs::new(1);
+        for rule_id in &self.rule_ids {
+            writeln!(symbol_file, "{tab}{rule_id},")?;
+        }
+        writeln!(symbol_file, "}}")
+    }
+
     fn write_terminal_class_from_impl(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
         write!(
             symbol_file,
@@ -512,6 +533,31 @@ impl From<usize> for TerminalClass {{
         )
     }
 
+    fn write_rule_ids_from_impl(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
+        write!(
+            symbol_file,
+            r#"
+impl From<usize> for RuleIDs {{
+    fn from(value: usize) -> Self {{
+        match value {{
+"#
+        )?;
+
+        let tabs = Tabs::new(3);
+        for (i, name) in self.rule_ids.iter().enumerate() {
+            writeln!(symbol_file, "{tabs}{} => RuleIDs::{name},", i + 1)?;
+        }
+        write!(symbol_file, "{tabs}_ => panic!()")?;
+
+        writeln!(
+            symbol_file,
+            r#"
+        }}
+    }}
+}}"#
+        )
+    }
+
     fn action_string(&self, action: &Action) -> String {
         match action {
             Action::Shift(state) => {
@@ -523,6 +569,24 @@ impl From<usize> for TerminalClass {{
             Action::Accept => "Accept".to_string(),
             Action::Error => "Error".to_string(),
         }
+    }
+
+    fn calculate_rule_ids(
+        rules: &[Rc<Rule>],
+        non_terminals: &[(NonTerminal, String)],
+    ) -> Vec<String> {
+        let mut non_terminal_counts = HashMap::new();
+        let mut rule_ids = vec![];
+        for rule in rules.iter().skip(1) {
+            if !non_terminal_counts.contains_key(rule.head()) {
+                non_terminal_counts.insert(rule.head(), 0);
+            }
+            let count = non_terminal_counts.get_mut(rule.head()).unwrap();
+            let rule_name = &non_terminals[rule.head().id].1;
+            rule_ids.push(format!("{rule_name}{count}"));
+            *count += 1;
+        }
+        rule_ids
     }
 }
 
