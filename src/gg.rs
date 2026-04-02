@@ -13,6 +13,7 @@ pub struct Gg {
     pub terminals: Vec<(Terminal, String)>,
     pub non_terminals: Vec<(NonTerminal, String)>,
     pub rules: Vec<Rc<Rule>>,
+    pub non_terminal_rule_counts: Vec<usize>,
     pub priorities: HashMap<TerminalOrRule, Priority>,
     pub token_specs: Vec<TokenSpec>,
 }
@@ -91,6 +92,7 @@ impl Gg {
             terminals: terminals.into_iter().zip(terminal_names).collect(),
             non_terminals: non_terminals.into_iter().zip(non_terminal_names).collect(),
             rules,
+            non_terminal_rule_counts: vec![],
             priorities,
             token_specs: vec![],
         }
@@ -132,6 +134,7 @@ impl Gg {
             terminals: terminals.into_iter().zip(terminal_names).collect(),
             non_terminals: non_terminals.into_iter().zip(non_terminal_names).collect(),
             rules,
+            non_terminal_rule_counts: vec![],
             priorities: HashMap::new(),
             token_specs: vec![],
         }

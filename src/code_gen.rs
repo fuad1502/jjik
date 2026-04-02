@@ -21,20 +21,19 @@ pub struct CodeGen {
     terminals: Vec<(Terminal, String)>,
     non_terminals: Vec<(NonTerminal, String)>,
     rules: Vec<Rc<Rule>>,
-    rule_ids: Vec<String>,
+    non_terminal_rule_counts: Vec<usize>,
 }
 
 impl CodeGen {
     pub fn new(gg: Gg) -> Self {
         let parse_table = ParseTable::new(&gg);
-        let rule_ids = CodeGen::calculate_rule_ids(&gg.rules, &gg.non_terminals);
         Self {
             token_specs: gg.token_specs,
             parse_table,
             terminals: gg.terminals,
             non_terminals: gg.non_terminals,
             rules: gg.rules,
-            rule_ids,
+            non_terminal_rule_counts: gg.non_terminal_rule_counts,
         }
     }
 
@@ -71,8 +70,10 @@ impl CodeGen {
         self.write_non_terminal_class_enum(symbol_file)?;
         self.write_terminal_class_enum(symbol_file)?;
         self.write_rule_ids_enum(symbol_file)?;
+        self.write_rule_group_enums(symbol_file)?;
         self.write_terminal_class_from_impl(symbol_file)?;
-        self.write_rule_ids_from_impl(symbol_file)
+        self.write_rule_ids_from_impl(symbol_file)?;
+        self.write_rule_group_from_impls(symbol_file)
     }
 
     fn write_parser_impl(&self, parser_file: &mut File) -> std::io::Result<()> {
@@ -501,10 +502,28 @@ pub enum RuleIDs {{"#
         )?;
 
         let tab = Tabs::new(1);
-        for rule_id in &self.rule_ids {
-            writeln!(symbol_file, "{tab}{rule_id},")?;
+        for (_, name) in self.non_terminals.iter().skip(1) {
+            writeln!(symbol_file, "{tab}{name}({name}Rules),")?;
         }
         writeln!(symbol_file, "}}")
+    }
+
+    fn write_rule_group_enums(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
+        let tab = Tabs::new(1);
+        for (terminal, name) in self.non_terminals.iter().skip(1) {
+            writeln!(
+                symbol_file,
+                r#"
+#[derive(Debug, Copy, Clone)]
+pub enum {name}Rules {{"#
+            )?;
+            for i in 0..self.non_terminal_rule_counts[terminal.id] {
+                writeln!(symbol_file, "{tab}Rule{i},")?;
+            }
+            writeln!(symbol_file, "}}")?;
+        }
+
+        Ok(())
     }
 
     fn write_terminal_class_from_impl(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
@@ -543,9 +562,13 @@ impl From<usize> for RuleIDs {{
 "#
         )?;
 
+        let rule_ids = Self::calculate_rule_ids(&self.rules, &self.non_terminals);
         let tabs = Tabs::new(3);
-        for (i, name) in self.rule_ids.iter().enumerate() {
-            writeln!(symbol_file, "{tabs}{} => RuleIDs::{name},", i + 1)?;
+        for (i, (name, order)) in rule_ids.iter().enumerate().skip(1) {
+            writeln!(
+                symbol_file,
+                "{tabs}{i} => RuleIDs::{name}({name}Rules::Rule{order}),",
+            )?;
         }
         write!(symbol_file, "{tabs}_ => panic!()")?;
 
@@ -556,6 +579,45 @@ impl From<usize> for RuleIDs {{
     }}
 }}"#
         )
+    }
+
+    fn write_rule_group_from_impls(&self, symbol_file: &mut File) -> Result<(), std::io::Error> {
+        if self.non_terminals.len() == 1 {
+            return Ok(());
+        }
+
+        if self.non_terminals.len() == 2 {
+            let rule_name = &self.non_terminals[1].1;
+            return writeln!(
+                symbol_file,
+                r#"
+impl From<&RuleIDs> for {rule_name}Rules {{
+    fn from(value: &RuleIDs) -> Self {{
+        match value {{
+            RuleIDs::{rule_name}(rule_group) => *rule_group,
+        }}
+    }}
+}}"#
+            );
+        }
+
+        for (_, rule_name) in self.non_terminals.iter().skip(1) {
+            writeln!(
+                symbol_file,
+                r#"
+impl TryFrom<&RuleIDs> for {rule_name}Rules {{
+    type Error = ();
+    fn try_from(value: &RuleIDs) -> Result<Self, Self::Error> {{
+        match value {{
+            RuleIDs::{rule_name}(rule_group) => Ok(*rule_group),
+            _ => Err(())
+        }}
+    }}
+}}"#
+            )?;
+        }
+
+        Ok(())
     }
 
     fn action_string(&self, action: &Action) -> String {
@@ -571,19 +633,19 @@ impl From<usize> for RuleIDs {{
         }
     }
 
-    fn calculate_rule_ids(
+    fn calculate_rule_ids<'a>(
         rules: &[Rc<Rule>],
-        non_terminals: &[(NonTerminal, String)],
-    ) -> Vec<String> {
+        non_terminals: &'a [(NonTerminal, String)],
+    ) -> Vec<(&'a String, usize)> {
         let mut non_terminal_counts = HashMap::new();
         let mut rule_ids = vec![];
-        for rule in rules.iter().skip(1) {
+        for rule in rules.iter() {
             if !non_terminal_counts.contains_key(rule.head()) {
                 non_terminal_counts.insert(rule.head(), 0);
             }
             let count = non_terminal_counts.get_mut(rule.head()).unwrap();
             let rule_name = &non_terminals[rule.head().id].1;
-            rule_ids.push(format!("{rule_name}{count}"));
+            rule_ids.push((rule_name, *count));
             *count += 1;
         }
         rule_ids

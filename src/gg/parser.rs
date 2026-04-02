@@ -14,6 +14,7 @@ pub struct Parser {
     terminals: Vec<(Terminal, String)>,
     non_terminals: Vec<(NonTerminal, String)>,
     rules: Vec<Rc<Rule>>,
+    non_terminal_rule_counts: Vec<usize>,
     priorities: HashMap<TerminalOrRule, Priority>,
     token_specs: Vec<TokenSpec>,
 }
@@ -25,6 +26,7 @@ impl Parser {
             terminals: vec![(Terminal::End, "End".to_string())],
             non_terminals: vec![(NonTerminal { id: 0 }, "SAcc".to_string())],
             rules: vec![],
+            non_terminal_rule_counts: vec![0],
             priorities: HashMap::new(),
             token_specs: vec![],
         }
@@ -43,6 +45,7 @@ impl Parser {
             terminals: self.terminals,
             non_terminals: self.non_terminals,
             rules: self.rules,
+            non_terminal_rule_counts: self.non_terminal_rule_counts,
             priorities: self.priorities,
             token_specs: self.token_specs,
         })
@@ -182,6 +185,7 @@ impl Parser {
 
     fn insert_rules(&mut self, head: lexer::Token, rules_components: Vec<Vec<lexer::Token>>) {
         let head = self.insert_or_get_non_terminal(head);
+        let number_of_rules = rules_components.len();
         for components in rules_components {
             let mut symbols = vec![];
             for token in components {
@@ -196,6 +200,7 @@ impl Parser {
             let rule = Rule { head, symbols };
             self.rules.push(Rc::new(rule));
         }
+        self.non_terminal_rule_counts[head.id] += number_of_rules;
     }
 
     fn insert_or_get_non_terminal(&mut self, token: lexer::Token) -> NonTerminal {
@@ -214,6 +219,7 @@ impl Parser {
         };
         self.non_terminals
             .push((non_terminal, non_terminal_name.to_string()));
+        self.non_terminal_rule_counts.push(0);
         non_terminal
     }
 
